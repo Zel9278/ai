@@ -1,15 +1,15 @@
-import autobind from 'autobind-decorator';
-import * as loki from 'lokijs';
-import Module from '@/module';
-import Message from '@/message';
-import serifs, { getSerif } from '@/serifs';
-import { acct } from '@/utils/acct';
-import config from '@/config';
+import autobind from "autobind-decorator";
+import * as loki from "lokijs";
+import Module from "@/module";
+import Message from "@/message";
+import serifs, { getSerif } from "@/serifs";
+import { acct } from "@/utils/acct";
+import config from "@/config";
 
 const NOTIFY_INTERVAL = 1000 * 60 * 60 * 12;
 
 export default class extends Module {
-	public readonly name = 'reminder';
+	public readonly name = "reminder";
 
 	private reminds: loki.Collection<{
 		userId: string;
@@ -22,8 +22,8 @@ export default class extends Module {
 
 	@autobind
 	public install() {
-		this.reminds = this.ai.getCollection('reminds', {
-			indices: ['userId', 'id']
+		this.reminds = this.ai.getCollection("reminds", {
+			indices: ["userId", "id"],
 		});
 
 		return {
@@ -36,32 +36,47 @@ export default class extends Module {
 	@autobind
 	private async mentionHook(msg: Message) {
 		let text = msg.extractedText.toLowerCase();
-		if (!text.startsWith('remind') && !text.startsWith('todo')) return false;
+		if (!text.startsWith("remind") && !text.startsWith("todo")) return false;
 
-		if (text.startsWith('reminds') || text.startsWith('todos')) {
+		if (text.startsWith("reminds") || text.startsWith("todos")) {
 			const reminds = this.reminds.find({
 				userId: msg.userId,
 			});
 
-			const getQuoteLink = id => `[${id}](${config.host}/notes/${id})`;
+			const getQuoteLink = (id) => `[${id}](${config.host}/notes/${id})`;
 
-			msg.reply(serifs.reminder.reminds + '\n' + reminds.map(remind => `・${remind.thing ? remind.thing : getQuoteLink(remind.quoteId)}`).join('\n'));
+			msg.reply(
+				serifs.reminder.reminds +
+					"\n" +
+					reminds
+						.map(
+							(remind) =>
+								`・${
+									remind.thing ? remind.thing : getQuoteLink(remind.quoteId)
+								}`
+						)
+						.join("\n")
+			);
 			return true;
 		}
 
 		if (text.match(/^(.+?)\s(.+)/)) {
-			text = text.replace(/^(.+?)\s/, '');
+			text = text.replace(/^(.+?)\s/, "");
 		} else {
-			text = '';
+			text = "";
 		}
 
-		const separatorIndex = text.indexOf(' ') > -1 ? text.indexOf(' ') : text.indexOf('\n');
+		const separatorIndex =
+			text.indexOf(" ") > -1 ? text.indexOf(" ") : text.indexOf("\n");
 		const thing = text.substr(separatorIndex + 1).trim();
 
-		if (thing === '' && msg.quoteId == null || msg.visibility === 'followers') {
+		if (
+			(thing === "" && msg.quoteId == null) ||
+			msg.visibility === "followers"
+		) {
 			msg.reply(serifs.reminder.invalid);
 			return {
-				reaction: '🆖',
+				reaction: "🆖",
 				immediate: true,
 			};
 		}
@@ -69,7 +84,7 @@ export default class extends Module {
 		const remind = this.reminds.insertOne({
 			id: msg.id,
 			userId: msg.userId,
-			thing: thing === '' ? null : thing,
+			thing: thing === "" ? null : thing,
 			quoteId: msg.quoteId,
 			times: 0,
 			createdAt: Date.now(),
@@ -77,13 +92,13 @@ export default class extends Module {
 
 		// メンションをsubscribe
 		this.subscribeReply(remind!.id, msg.id, {
-			id: remind!.id
+			id: remind!.id,
 		});
 
 		if (msg.quoteId) {
 			// 引用元をsubscribe
 			this.subscribeReply(remind!.id, msg.quoteId, {
-				id: remind!.id
+				id: remind!.id,
 			});
 		}
 
@@ -93,7 +108,7 @@ export default class extends Module {
 		});
 
 		return {
-			reaction: '🆗',
+			reaction: "🆗",
 			immediate: true,
 		};
 	}
@@ -111,14 +126,18 @@ export default class extends Module {
 			return;
 		}
 
-		const done = msg.includes(['done', 'やった', 'やりました', 'はい']);
-		const cancel = msg.includes(['やめる', 'やめた', 'キャンセル']);
+		const done = msg.includes(["done", "やった", "やりました", "はい"]);
+		const cancel = msg.includes(["やめる", "やめた", "キャンセル"]);
 		const isOneself = msg.userId === remind.userId;
 
 		if ((done || cancel) && isOneself) {
 			this.unsubscribeReply(key);
 			this.reminds.remove(remind);
-			msg.reply(done ? getSerif(serifs.reminder.done(msg.friend.name)) : serifs.reminder.cancel);
+			msg.reply(
+				done
+					? getSerif(serifs.reminder.done(msg.friend.name))
+					: serifs.reminder.cancel
+			);
 			return;
 		} else if (isOneself === false) {
 			msg.reply(serifs.reminder.doneFromInvalidUser);
@@ -131,7 +150,7 @@ export default class extends Module {
 	@autobind
 	private async timeoutCallback(data) {
 		const remind = this.reminds.findOne({
-			id: data.id
+			id: data.id,
 		});
 		if (remind == null) return;
 
@@ -144,21 +163,26 @@ export default class extends Module {
 		let reply;
 		try {
 			reply = await this.ai.post({
-				renoteId: remind.thing == null && remind.quoteId ? remind.quoteId : remind.id,
-				text: acct(friend.doc.user) + ' ' + serifs.reminder.notify(friend.name)
+				renoteId:
+					remind.thing == null && remind.quoteId ? remind.quoteId : remind.id,
+				text: acct(friend.doc.user) + " " + serifs.reminder.notify(friend.name),
 			});
 		} catch (err) {
 			// renote対象が消されていたらリマインダー解除
 			if (err.statusCode === 400) {
-				this.unsubscribeReply(remind.thing == null && remind.quoteId ? remind.quoteId : remind.id);
+				this.unsubscribeReply(
+					remind.thing == null && remind.quoteId ? remind.quoteId : remind.id
+				);
 				this.reminds.remove(remind);
 				return;
 			}
 			return;
 		}
 
+		if (!reply) return;
+
 		this.subscribeReply(remind.id, reply.id, {
-			id: remind.id
+			id: remind.id,
 		});
 
 		// タイマーセット

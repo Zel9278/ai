@@ -1,10 +1,10 @@
-import autobind from 'autobind-decorator';
-import Module from '@/module';
-import Message from '@/message';
-import serifs from '@/serifs';
+import autobind from "autobind-decorator";
+import Module from "@/module";
+import Message from "@/message";
+import serifs from "@/serifs";
 
 export default class extends Module {
-	public readonly name = 'timer';
+	public readonly name = "timer";
 
 	@autobind
 	public install() {
@@ -16,9 +16,9 @@ export default class extends Module {
 
 	@autobind
 	private async mentionHook(msg: Message) {
-		const secondsQuery = (msg.text || '').match(/([0-9]+)秒/);
-		const minutesQuery = (msg.text || '').match(/([0-9]+)分/);
-		const hoursQuery = (msg.text || '').match(/([0-9]+)時間/);
+		const secondsQuery = (msg.text || "").match(/([0-9]+)秒/);
+		const minutesQuery = (msg.text || "").match(/([0-9]+)分/);
+		const hoursQuery = (msg.text || "").match(/([0-9]+)時間/);
 
 		const seconds = secondsQuery ? parseInt(secondsQuery[1], 10) : 0;
 		const minutes = minutesQuery ? parseInt(minutesQuery[1], 10) : 0;
@@ -26,15 +26,12 @@ export default class extends Module {
 
 		if (!(secondsQuery || minutesQuery || hoursQuery)) return false;
 
-		if ((seconds + minutes + hours) == 0) {
+		if (seconds + minutes + hours == 0) {
 			msg.reply(serifs.timer.invalid);
 			return true;
 		}
 
-		const time =
-			(1000 * seconds) +
-			(1000 * 60 * minutes) +
-			(1000 * 60 * 60 * hours);
+		const time = 1000 * seconds + 1000 * 60 * minutes + 1000 * 60 * 60 * hours;
 
 		if (time > 86400000) {
 			msg.reply(serifs.timer.tooLong);
@@ -43,13 +40,15 @@ export default class extends Module {
 
 		msg.reply(serifs.timer.set);
 
-		const str = `${hours ? hoursQuery![0] : ''}${minutes ? minutesQuery![0] : ''}${seconds ? secondsQuery![0] : ''}`;
+		const str = `${hours ? hoursQuery![0] : ""}${
+			minutes ? minutesQuery![0] : ""
+		}${seconds ? secondsQuery![0] : ""}`;
 
 		// タイマーセット
 		this.setTimeoutWithPersistence(time, {
 			msgId: msg.id,
 			userId: msg.friend.userId,
-			time: str
+			time: str,
 		});
 
 		return true;
@@ -62,7 +61,7 @@ export default class extends Module {
 		const text = serifs.timer.notify(data.time, friend.name);
 		this.ai.post({
 			replyId: data.msgId,
-			text: text
+			text: text,
 		});
 	}
 }

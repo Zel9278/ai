@@ -1,24 +1,28 @@
 // AI CORE
 
-import * as fs from 'fs';
-import autobind from 'autobind-decorator';
-import * as loki from 'lokijs';
-import * as request from 'request-promise-native';
-import * as chalk from 'chalk';
-import { v4 as uuid } from 'uuid';
-const delay = require('timeout-as-promise');
+import * as fs from "fs";
+import autobind from "autobind-decorator";
+import * as loki from "lokijs";
+import * as request from "request-promise-native";
+import * as chalk from "chalk";
+import { v4 as uuid } from "uuid";
+const delay = require("timeout-as-promise");
 
-import config from '@/config';
-import Module from '@/module';
-import Message from '@/message';
-import Friend, { FriendDoc } from '@/friend';
-import { User } from '@/misskey/user';
-import Stream from '@/stream';
-import log from '@/utils/log';
-const pkg = require('../package.json');
+import config from "@/config";
+import Module from "@/module";
+import Message from "@/message";
+import Friend, { FriendDoc } from "@/friend";
+import { User } from "@/misskey/user";
+import Stream from "@/stream";
+import log from "@/utils/log";
+const pkg = require("../package.json");
 
 type MentionHook = (msg: Message) => Promise<boolean | HandlerResult>;
-type ContextHook = (key: any, msg: Message, data?: any) => Promise<void | boolean | HandlerResult>;
+type ContextHook = (
+	key: any,
+	msg: Message,
+	data?: any
+) => Promise<void | boolean | HandlerResult>;
 type TimeoutCallback = (data?: any) => void;
 
 export type HandlerResult = {
@@ -80,11 +84,14 @@ export default class 藍 {
 		this.account = account;
 		this.modules = modules;
 
-		let memoryDir = '.';
+		let memoryDir = ".";
 		if (config.memoryDir) {
 			memoryDir = config.memoryDir;
 		}
-		const file = process.env.NODE_ENV === 'test' ? `${memoryDir}/test.memory.json` : `${memoryDir}/memory.json`;
+		const file =
+			process.env.NODE_ENV === "test"
+				? `${memoryDir}/test.memory.json`
+				: `${memoryDir}/memory.json`;
 
 		this.log(`Lodaing the memory from ${file}...`);
 
@@ -92,14 +99,14 @@ export default class 藍 {
 			autoload: true,
 			autosave: true,
 			autosaveInterval: 1000,
-			autoloadCallback: err => {
+			autoloadCallback: (err) => {
 				if (err) {
 					this.log(chalk.red(`Failed to load the memory: ${err}`));
 				} else {
-					this.log(chalk.green('The memory loaded successfully'));
+					this.log(chalk.green("The memory loaded successfully"));
 					this.run();
 				}
-			}
+			},
 		});
 	}
 
@@ -111,22 +118,22 @@ export default class 藍 {
 	@autobind
 	private run() {
 		//#region Init DB
-		this.meta = this.getCollection('meta', {});
+		this.meta = this.getCollection("meta", {});
 
-		this.contexts = this.getCollection('contexts', {
-			indices: ['key']
+		this.contexts = this.getCollection("contexts", {
+			indices: ["key"],
 		});
 
-		this.timers = this.getCollection('timers', {
-			indices: ['module']
+		this.timers = this.getCollection("timers", {
+			indices: ["module"],
 		});
 
-		this.friends = this.getCollection('friends', {
-			indices: ['userId']
+		this.friends = this.getCollection("friends", {
+			indices: ["userId"],
 		});
 
-		this.moduleData = this.getCollection('moduleData', {
-			indices: ['module']
+		this.moduleData = this.getCollection("moduleData", {
+			indices: ["module"],
 		});
 		//#endregion
 
@@ -137,60 +144,64 @@ export default class 藍 {
 		this.connection = new Stream();
 
 		//#region Main stream
-		const mainStream = this.connection.useSharedConnection('main');
+		const mainStream = this.connection.useSharedConnection("main");
 
 		// メンションされたとき
-		mainStream.on('mention', async data => {
+		mainStream.on("mention", async (data) => {
 			if (data.userId == this.account.id) return; // 自分は弾く
-			if (data.text && data.text.startsWith('@' + this.account.username)) {
+			if (data.text && data.text.startsWith("@" + this.account.username)) {
 				// Misskeyのバグで投稿が非公開扱いになる
-				if (data.text == null) data = await this.api('notes/show', { noteId: data.id });
+				if (data.text == null)
+					data = await this.api("notes/show", { noteId: data.id });
 				this.onReceiveMessage(new Message(this, data));
 			}
 		});
 
 		// 返信されたとき
-		mainStream.on('reply', async data => {
+		mainStream.on("reply", async (data) => {
 			if (data.userId == this.account.id) return; // 自分は弾く
-			if (data.text && data.text.startsWith('@' + this.account.username)) return;
+			if (data.text && data.text.startsWith("@" + this.account.username))
+				return;
 			// Misskeyのバグで投稿が非公開扱いになる
-			if (data.text == null) data = await this.api('notes/show', { noteId: data.id });
+			if (data.text == null)
+				data = await this.api("notes/show", { noteId: data.id });
 			this.onReceiveMessage(new Message(this, data));
 		});
 
 		// Renoteされたとき
-		mainStream.on('renote', async data => {
+		mainStream.on("renote", async (data) => {
 			if (data.userId == this.account.id) return; // 自分は弾く
 			if (data.text == null && (data.files || []).length == 0) return;
 
 			// リアクションする
-			this.api('notes/reactions/create', {
+			this.api("notes/reactions/create", {
 				noteId: data.id,
-				reaction: 'love'
+				reaction: "love",
 			});
 		});
 
 		// メッセージ
-		mainStream.on('messagingMessage', data => {
+		mainStream.on("messagingMessage", (data) => {
 			if (data.userId == this.account.id) return; // 自分は弾く
 			this.onReceiveMessage(new Message(this, data));
 		});
 
 		// 通知
-		mainStream.on('notification', data => {
+		mainStream.on("notification", (data) => {
 			this.onNotification(data);
 		});
 		//#endregion
 
 		// Install modules
-		this.modules.forEach(m => {
+		this.modules.forEach((m) => {
 			this.log(`Installing ${chalk.cyan.italic(m.name)}\tmodule...`);
 			m.init(this);
 			const res = m.install();
 			if (res != null) {
 				if (res.mentionHook) this.mentionHooks.push(res.mentionHook);
 				if (res.contextHook) this.contextHooks[m.name] = res.contextHook;
-				if (res.timeoutCallback) this.timeoutCallbacks[m.name] = res.timeoutCallback;
+				if (res.timeoutCallback)
+					this.timeoutCallbacks[m.name] = res.timeoutCallback;
 			}
 		});
 
@@ -200,7 +211,7 @@ export default class 藍 {
 
 		setInterval(this.logWaking, 10000);
 
-		this.log(chalk.green.bold('Ai am now running!'));
+		this.log(chalk.green.bold("Ai am now running!"));
 	}
 
 	/**
@@ -220,11 +231,13 @@ export default class 藍 {
 		const isNoContext = msg.replyId == null;
 
 		// Look up the context
-		const context = isNoContext ? null : this.contexts.findOne({
-			noteId: msg.replyId
-		});
+		const context = isNoContext
+			? null
+			: this.contexts.findOne({
+					noteId: msg.replyId,
+			  });
 
-		let reaction: string | null = 'love';
+		let reaction: string | null = "love";
 		let immediate: boolean = false;
 
 		//#region
@@ -233,10 +246,10 @@ export default class 藍 {
 
 			for (const handler of this.mentionHooks) {
 				res = await handler(msg);
-				if (res === true || typeof res === 'object') break;
+				if (res === true || typeof res === "object") break;
 			}
 
-			if (res != null && typeof res === 'object') {
+			if (res != null && typeof res === "object") {
 				if (res.reaction != null) reaction = res.reaction;
 				if (res.immediate != null) immediate = res.immediate;
 			}
@@ -248,7 +261,7 @@ export default class 藍 {
 			const handler = this.contextHooks[context.module];
 			const res = await handler(context.key, msg, context.data);
 
-			if (res != null && typeof res === 'object') {
+			if (res != null && typeof res === "object") {
 				if (res.reaction != null) reaction = res.reaction;
 				if (res.immediate != null) immediate = res.immediate;
 			}
@@ -267,9 +280,9 @@ export default class 藍 {
 
 		// リアクションする
 		if (reaction) {
-			this.api('notes/reactions/create', {
+			this.api("notes/reactions/create", {
 				noteId: msg.id,
-				reaction: reaction
+				reaction: reaction,
 			});
 		}
 	}
@@ -279,7 +292,7 @@ export default class 藍 {
 		switch (notification.type) {
 			// リアクションされたら親愛度を少し上げる
 			// TODO: リアクション取り消しをよしなにハンドリングする
-			case 'reaction': {
+			case "reaction": {
 				const friend = new Friend(this, { user: notification.user });
 				friend.incLove(0.1);
 				break;
@@ -327,9 +340,9 @@ export default class 藍 {
 	}
 
 	@autobind
-	public lookupFriend(userId: User['id']): Friend | null {
+	public lookupFriend(userId: User["id"]): Friend | null {
 		const doc = this.friends.findOne({
-			userId: userId
+			userId: userId,
 		});
 
 		if (doc == null) return null;
@@ -350,10 +363,10 @@ export default class 藍 {
 				i: config.i,
 				file: {
 					value: file,
-					options: meta
-				}
+					options: meta,
+				},
 			},
-			json: true
+			json: true,
 		});
 		return res;
 	}
@@ -363,8 +376,14 @@ export default class 藍 {
 	 */
 	@autobind
 	public async post(param: any) {
-		const res = await this.api('notes/create', param);
-		return res.createdNote;
+		let res;
+		try {
+			res = await this.api("notes/create", param);
+		} catch (error) {
+			console.error(error);
+		}
+
+		return res?.createdNote || [];
 	}
 
 	/**
@@ -372,9 +391,16 @@ export default class 藍 {
 	 */
 	@autobind
 	public sendMessage(userId: any, param: any) {
-		return this.api('messaging/messages/create', Object.assign({
-			userId: userId,
-		}, param));
+		return this.api(
+			"notes/create",
+			Object.assign(
+				{
+					visibility: "specified",
+					visibleUserIds: [userId],
+				},
+				param
+			)
+		);
 	}
 
 	/**
@@ -383,11 +409,14 @@ export default class 藍 {
 	@autobind
 	public api(endpoint: string, param?: any) {
 		return request.post(`${config.apiUrl}/${endpoint}`, {
-			json: Object.assign({
-				i: config.i
-			}, param)
+			json: Object.assign(
+				{
+					i: config.i,
+				},
+				param
+			),
 		});
-	};
+	}
 
 	/**
 	 * コンテキストを生成し、ユーザーからの返信を待ち受けます
@@ -397,12 +426,17 @@ export default class 藍 {
 	 * @param data コンテキストに保存するオプションのデータ
 	 */
 	@autobind
-	public subscribeReply(module: Module, key: string | null, id: string, data?: any) {
+	public subscribeReply(
+		module: Module,
+		key: string | null,
+		id: string,
+		data?: any
+	) {
 		this.contexts.insertOne({
 			noteId: id,
 			module: module.name,
 			key: key,
-			data: data
+			data: data,
 		});
 	}
 
@@ -415,7 +449,7 @@ export default class 藍 {
 	public unsubscribeReply(module: Module, key: string | null) {
 		this.contexts.findAndRemove({
 			key: key,
-			module: module.name
+			module: module.name,
 		});
 	}
 
@@ -434,7 +468,7 @@ export default class 藍 {
 			module: module.name,
 			insertedAt: Date.now(),
 			delay: delay,
-			data: data
+			data: data,
 		});
 
 		this.log(`Timer persisted: ${module.name} ${id} ${delay}ms`);
