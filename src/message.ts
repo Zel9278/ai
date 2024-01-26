@@ -1,13 +1,13 @@
-import autobind from "autobind-decorator";
-import * as chalk from "chalk";
-const delay = require("timeout-as-promise");
+import { bindThis } from '@/decorators.js';
+import chalk from 'chalk';
 
-import 藍 from "@/ai";
-import Friend from "@/friend";
-import { User } from "@/misskey/user";
-import includes from "@/utils/includes";
-import or from "@/utils/or";
-import config from "@/config";
+import 藍 from '@/ai.js';
+import Friend from '@/friend.js';
+import type { User } from '@/misskey/user.js';
+import includes from '@/utils/includes.js';
+import or from '@/utils/or.js';
+import config from '@/config.js';
+import { sleep } from '@/utils/sleep.js';
 
 export default class Message {
 	private ai: 藍;
@@ -70,22 +70,19 @@ export default class Message {
 			});
 	}
 
-	@autobind
-	public async reply(
-		text: string | null,
-		opts?: {
-			file?: any;
-			cw?: string;
-			renote?: string;
-			immediate?: boolean;
-		}
-	) {
+	@bindThis
+	public async reply(text: string | null, opts?: {
+		file?: any;
+		cw?: string;
+		renote?: string;
+		immediate?: boolean;
+	}) {
 		if (text == null) return;
 
 		this.ai.log(`>>> Sending reply to ${chalk.underline(this.id)}`);
 
 		if (!opts?.immediate) {
-			await delay(2000);
+			await sleep(2000);
 		}
 
 		try {
@@ -101,12 +98,12 @@ export default class Message {
 		}
 	}
 
-	@autobind
+	@bindThis
 	public includes(words: string[]): boolean {
 		return includes(this.text, words);
 	}
 
-	@autobind
+	@bindThis
 	public or(words: (string | RegExp)[]): boolean {
 		return or(this.text, words);
 	}
